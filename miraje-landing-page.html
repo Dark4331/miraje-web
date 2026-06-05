@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Miraje — Private AI, On Your Machine</title>
+<meta name="description" content="Miraje is a fully private, local AI client that runs entirely on your device. No servers, no data collection, no cloud. Your AI, your rules.">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #000000;
+    --white: #ffffff;
+    --cyan: #00e5ff;
+    --white50: rgba(255,255,255,0.50);
+    --white25: rgba(255,255,255,0.25);
+    --cyan03: rgba(0,229,255,0.03);
+    --cyan08: rgba(0,229,255,0.08);
+    --cyan15: rgba(0,229,255,0.15);
+    --cyan25: rgba(0,229,255,0.25);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* ── canvas background ── */
+  #wave-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    image-rendering: pixelated;
+  }
+
+  /* ── radial glow ── */
+  .glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(ellipse 60% 50% at 50% 30%, rgba(0,229,255,0.05) 0%, transparent 70%);
+  }
+
+  /* ── wrapper ── */
+  .wrapper {
+    position: relative;
+    z-index: 2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── hero ── */
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8rem 1.5rem 5rem;
+  }
+  @media (min-width: 768px) { .hero { padding: 10rem 2rem 7rem; } }
+
+  .logo-wrap { margin-bottom: 2.5rem; }
+  .logo-box {
+    width: 7rem; height: 7rem;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 0 80px rgba(0,229,255,0.15), 0 0 0 1px rgba(0,229,255,0.25);
+  }
+  .logo-box img { width: 100%; height: 100%; object-fit: cover; }
+  @media (min-width: 768px) { .logo-box { width: 9rem; height: 9rem; } }
+
+  .title {
+    font-size: 3rem;
+    font-weight: 200;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--white);
+  }
+  @media (min-width: 768px) { .title { font-size: 4.5rem; letter-spacing: 0.4em; } }
+  @media (min-width: 1024px) { .title { font-size: 6rem; } }
+  .title span { color: var(--cyan); }
+
+  .tagline {
+    margin-top: 1.5rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--white50);
+  }
+  @media (min-width: 768px) { .tagline { font-size: 1.1rem; } }
+
+  /* ── pills ── */
+  .pills { margin-top: 2.5rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.4rem 1rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    background: var(--cyan03);
+    border: 1px solid var(--cyan08);
+  }
+
+  /* ── CTA ── */
+  .cta { margin-top: 3.5rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+  .cta a {
+    display: inline-flex; align-items: center; gap: 0.75rem;
+    border-radius: 9999px;
+    padding: 1.2rem 2rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .cta-primary {
+    background: var(--cyan);
+    color: var(--bg);
+    box-shadow: 0 0 40px rgba(0,229,255,0.25);
+  }
+  .cta-primary:hover {
+    box-shadow: 0 0 60px rgba(0,229,255,0.35);
+    transform: translateY(-2px);
+  }
+  .cta-ghost {
+    color: var(--cyan);
+    border: 1px solid rgba(0,229,255,0.25);
+    background: transparent;
+  }
+  .cta-ghost:hover {
+    background: rgba(0,229,255,0.05);
+    border-color: rgba(0,229,255,0.45);
+  }
+
+  /* ── scroll hint ── */
+  .scroll-hint {
+    margin-top: 5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .scroll-hint span {
+    font-size: 0.625rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--white25);
+  }
+  .scroll-arrow {
+    color: var(--cyan);
+    animation: bounce 1.8s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(6px); }
+  }
+
+  /* ── divider ── */
+  .divider {
+    position: relative;
+    z-index: 2;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 72rem;
+    padding: 0 1.5rem;
+  }
+  .divider-line {
+    height: 1px;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, var(--cyan25), transparent);
+  }
+
+  /* ── about ── */
+  .about {
+    position: relative;
+    z-index: 2;
+    padding: 6rem 1.5rem;
+  }
+  @media (min-width: 768px) { .about { padding: 8rem 1.5rem; } }
+  .about-inner { max-width: 72rem; margin: 0 auto; }
+
+  .about-header {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  @media (min-width: 768px) { .about-header { margin-bottom: 5rem; } }
+  .about-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 1rem;
+  }
+  .about-heading {
+    font-size: 1.875rem;
+    font-weight: 200;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--white);
+  }
+  @media (min-width: 768px) { .about-heading { font-size: 3rem; } }
+  .about-desc {
+    margin-top: 1rem;
+    max-width: 36rem;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: var(--white50);
+  }
+
+  /* ── cards ── */
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  @media (min-width: 768px) { .cards { grid-template-columns: 1fr 1fr; } }
+
+  .card {
+    position: relative;
+    border-radius: 0.75rem;
+    padding: 2rem;
+    backdrop-filter: blur(4px);
+    background: var(--cyan03);
+    border: 1px solid var(--cyan08);
+    transition: all 0.3s ease;
+    cursor: default;
+  }
+  .card:hover {
+    background: rgba(0,229,255,0.06);
+    border-color: rgba(0,229,255,0.22);
+    transform: translateY(-6px);
+  }
+  .card-num {
+    position: absolute;
+    top: 1.5rem; right: 1.5rem;
+    font-size: 2.25rem;
+    font-weight: 200;
+    user-select: none;
+    color: rgba(0,229,255,0.08);
+  }
+  .card-icon { color: var(--cyan); margin-bottom: 1.25rem; }
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--white);
+    margin-bottom: 0.75rem;
+  }
+  .card-desc {
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: var(--white50);
+  }
+
+  /* ── footer ── */
+  .footer {
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding: 2rem 1.5rem;
+  }
+  .footer-inner {
+    max-width: 72rem;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .footer-copy {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.25);
+  }
+  .footer-links { display: flex; gap: 1.5rem; }
+  .footer-links a {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.25);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .footer-links a:hover { color: var(--cyan); }
+
+  /* ── fade-in animations ── */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(28px);
+    animation: fadeUp 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .d1 { animation-delay: 0s; }
+  .d2 { animation-delay: 0.1s; }
+  .d3 { animation-delay: 0.2s; }
+  .d4 { animation-delay: 0.3s; }
+  .d5 { animation-delay: 0.4s; }
+  .d6 { animation-delay: 0.5s; }
+
+  /* ── scroll-reveal ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(48px);
+    transition: opacity 0.65s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.65s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- Pixel wave canvas -->
+<canvas id="wave-canvas"></canvas>
+<div class="glow"></div>
+
+<div class="wrapper">
+
+  <!-- ═══ HERO ═══ -->
+  <section class="hero">
+
+    <div class="logo-wrap fade-up d1">
+      <div class="logo-box">
+        <img src="data:image/png;base64,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EwEsAAAAAEAnAlgAAAAAgE4EsAAAAAAAnQhgAQAAAAA6EcACAAAAAHQigAUAAAAA6EQACwAAAADQiQAWAAAAAKATASwAAAAAQCcCWAAAAACATgSwAAAAAACdCGABAAAAADoRwAIAAAAAdCKABQAAAADoRAALAAAAANCJABYAAAAAoBMBLAAAAABAJwJYAAAAAIBOBLAAAAAAAJ0IYAEAAAAAOhHAAgAAAAB0IoAFAAAAAOhEAAsAAAAA0IkAFgAAAACgEwEsAAAAAEAnAlgAAAAAgE4EsAAAAAAAnQhgAQAAAAA6EcACAAAAAHQigAUAAAAA6EQACwAAAADQiQAWAAAAAKATASwAAAAAQCcCWAAAAACATgSwAAAAAACdCGABAAAAADoRwAIAAAAAdCKABQAAAADoRAALAAAAANCJABYAAAAAoBMBLAAAAABAJwJYAAAAAIBOBLAAAAAAAJ0IYAEAAAAAOhHAAgAAAAB0IoAFAAAAAOhEAAsAAAAA0IkAFgAAAACgEwEsAAAAAEAnAlgAAAAAgE4EsAAAAAAAnQhgAQAAAAA6EcACAAAAAHQigAUAAAAA6EQACwAAAADQiQAWAAAAAKATASwAAAAAQCcCWAAAAACATgSwAAAAAACdCGABAAAAADoRwAIAAAAAdCKABQAAAADoRAALAAAAANCJABYAAAAAoBMBLAAAAABAJwJYAAAAAIBOBLAAAAAAAJ0IYAEAAAAAOhHAAgAAAAB0IoAFAAAAAOhEAAsAAAAA0IkAFgAAAACgEwEsAAAAAEAnAlgAAAAAgE4EsAAAAAAAnQhgAQAAAAA6EcACAAAAAHQigAUAAAAA6EQACwAAAADQiQAWAAAAAKATASwAAAAAQCcCWAAAAACATgSwAAAAAACdCGABAAAAADoRwAIAAAAAdCKABQAAAADoRAALAAAAANCJABYAAAAAoBMBLAAAAABAJwJYAAAAAIBOBLAAAAAAAJ0IYAEAAAAAOhHAAgAAAAB0IoAFAAAAAOhEAAsAAAAA0IkAFgAAAACgEwEsAAAAAEAnAlgAAAAAgE4EsAAAAAAAnQhgAQAAAAA6EcACAAAAAHQigAUAAAAA6EQACwAAAADQiQAWAAAAAKATASwAAAAAQCcCWAAAAACATgSwAAAAAACdCGABAAAAADoRwAIAAAAAdCKABQAAAADoRAALAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMBRwxguKrjWkKAAAAAElFTkSuQmCC" alt="Miraje AI">
+      </div>
+    </div>
+
+    <h1 class="title fade-up d2">Mir<span>aje</span></h1>
+
+    <p class="tagline fade-up d3">Private AI &middot; On Your Machine &middot; Yours Alone</p>
+
+    <div class="pills fade-up d4">
+      <span class="pill">&#x1F512; Private</span>
+      <span class="pill">&#x1F5A5; Local</span>
+      <span class="pill">&#x26A1; Fast</span>
+      <span class="pill">&#x1F513; Open Source</span>
+    </div>
+
+    <div class="cta fade-up d5">
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="cta-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        View on GitHub
+      </a>
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="cta-ghost">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+    </div>
+
+    <div class="scroll-hint fade-up d6">
+      <span>Scroll to explore</span>
+      <div class="scroll-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Divider -->
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <!-- ═══ ABOUT ═══ -->
+  <section class="about">
+    <div class="about-inner">
+
+      <div class="about-header reveal">
+        <p class="about-label">What Miraje Does</p>
+        <h2 class="about-heading">Your AI, Your Rules</h2>
+        <p class="about-desc">Miraje isn&rsquo;t another cloud AI wrapper. It&rsquo;s a local-first assistant designed to respect your autonomy, your data, and your workflow.</p>
+      </div>
+
+      <div class="cards">
+
+        <!-- Card 01 -->
+        <div class="card reveal" style="transition-delay:0s">
+          <span class="card-num">01</span>
+          <div class="card-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3 class="card-title">Privacy First</h3>
+          <p class="card-desc">Every conversation, every file, every prompt stays on your machine. No telemetry, no cloud uploads, no middlemen. Miraje was built from day one with a zero-knowledge architecture &mdash; your data is never visible to anyone but you.</p>
+        </div>
+
+        <!-- Card 02 -->
+        <div class="card reveal" style="transition-delay:0.15s">
+          <span class="card-num">02</span>
+          <div class="card-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>
+          </div>
+          <h3 class="card-title">Email Reading</h3>
+          <p class="card-desc">Miraje can connect to your local email client and intelligently read, summarize, and triage your inbox. Draft replies, flag priorities, and surface what matters &mdash; all without sending a single byte of your mail to an external server.</p>
+        </div>
+
+        <!-- Card 03 -->
+        <div class="card reveal" style="transition-delay:0.3s">
+          <span class="card-num">03</span>
+          <div class="card-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+          </div>
+          <h3 class="card-title">Skill &amp; Improvement</h3>
+          <p class="card-desc">Miraje learns from your feedback over time &mdash; not by uploading data, but by adapting locally. It picks up on your preferences, refines its responses, and grows alongside you without ever compromising your privacy.</p>
+        </div>
+
+        <!-- Card 04 -->
+        <div class="card reveal" style="transition-delay:0.45s">
+          <span class="card-num">04</span>
+          <div class="card-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <h3 class="card-title">Assistance, Not Replacement</h3>
+          <p class="card-desc">Miraje is here to amplify your capabilities &mdash; not replace them. It drafts, suggests, and organizes, but the final call is always yours. Think of it as a trusted copilot that respects your judgment and never oversteps.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Divider -->
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <p class="footer-copy">&copy; <span id="year"></span> Miraje AI. Open source &amp; free forever.</p>
+      <div class="footer-links">
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer">Docs</a>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer">License</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ── Year ──
+document.getElementById('year').textContent = new Date().getFullYear();
+
+// ── Scroll reveal ──
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Pixel wave background ──
+(function() {
+  const canvas = document.getElementById('wave-canvas');
+  const ctx = canvas.getContext('2d');
+  let time = 0;
+
+  const ACCENT = [0, 229, 255];
+  const PIXEL_SIZE = 10;
+  const WAVE_COUNT = 8;
+  const GAP = 2;
+
+  const resize = () => {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+
+  const draw = () => {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    const cols = Math.ceil(w / PIXEL_SIZE);
+    const rows = Math.ceil(h / PIXEL_SIZE);
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let col = 0; col < cols; col++) {
+      for (let row = 0; row < rows; row++) {
+        const x = col * PIXEL_SIZE;
+        const y = row * PIXEL_SIZE;
+        let intensity = 0;
+
+        // Horizontal waves
+        for (let wave = 0; wave < WAVE_COUNT; wave++) {
+          const layerProgress = wave / WAVE_COUNT;
+          const waveCenterY = h * 0.08 + h * 0.84 * layerProgress;
+          const waveSpeed = 0.5 + wave * 0.2;
+          const waveFreq = 0.006 + wave * 0.002;
+          const waveAmp = 30 + wave * 12;
+          const phase = wave * 0.9;
+          const waveY =
+            Math.sin(x * waveFreq + time * waveSpeed + phase) * waveAmp +
+            Math.cos(x * waveFreq * 0.6 + time * waveSpeed * 0.7 + phase * 1.3) * waveAmp * 0.4 +
+            Math.sin(x * waveFreq * 1.4 + time * waveSpeed * 1.2 + phase * 0.7) * waveAmp * 0.25;
+          const dist = Math.abs(y - waveCenterY - waveY);
+          const falloffWidth = 50 + wave * 8;
+          const falloff = Math.max(0, 1 - dist / falloffWidth);
+          intensity += falloff * falloff * 0.045;
+        }
+
+        // Diagonal waves
+        for (let d = 0; d < 2; d++) {
+          const diagAngle = 0.004 + d * 0.002;
+          const diagSpeed = 0.35 + d * 0.12;
+          const diagOffset = d * 2.5;
+          const diagY = Math.sin(x * diagAngle + y * diagAngle * 0.7 + time * diagSpeed + diagOffset) * 50;
+          const diagDist = Math.abs(y - h * 0.5 - diagY);
+          const diagFalloff = Math.max(0, 1 - diagDist / 80);
+          intensity += diagFalloff * diagFalloff * 0.02;
+        }
+
+        // Subtle column shimmer
+        const colPulse = Math.sin(col * 0.12 + time * 0.6) * 0.5 + 0.5;
+        intensity += colPulse * 0.008;
+
+        // Subtle mirage sparkle
+        const sparkle = Math.sin(x * 0.03 + y * 0.05 + time * 2.2) *
+          Math.cos(x * 0.07 - y * 0.02 + time * 1.8) * 0.5 + 0.5;
+        intensity += sparkle * 0.01;
+
+        // Gentle breathing
+        const breathe = Math.sin(time * 0.35) * 0.5 + 0.5;
+        intensity += breathe * 0.005;
+
+        intensity = Math.min(intensity, 0.25);
+
+        if (intensity > 0.018) {
+          ctx.fillStyle = 'rgba(' + ACCENT[0] + ',' + ACCENT[1] + ',' + ACCENT[2] + ',' + intensity + ')';
+          ctx.fillRect(x, y, PIXEL_SIZE - GAP, PIXEL_SIZE - GAP);
+        }
+      }
+    }
+
+    time += 0.028;
+    requestAnimationFrame(draw);
+  };
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+</script>
+</body>
+</html>
